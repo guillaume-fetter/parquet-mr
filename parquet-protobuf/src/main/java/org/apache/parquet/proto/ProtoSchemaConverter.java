@@ -55,30 +55,35 @@ public class ProtoSchemaConverter {
 
   /**
    * Instantiate a schema converter to get the parquet schema corresponding to protobuf classes.
-   * @param parquetSpecsCompliant   If set to false, the parquet schema generated will be using the old
-   *                                schema style (prior to PARQUET-968) to provide backward-compatibility
-   *                                but which does not use LIST and MAP wrappers around collections as required
-   *                                by the parquet specifications. If set to true, specs compliant schemas are used.
+   *
+   * @param parquetSpecsCompliant If set to false, the parquet schema generated will be using the old
+   *                              schema style (prior to PARQUET-968) to provide backward-compatibility
+   *                              but which does not use LIST and MAP wrappers around collections as required
+   *                              by the parquet specifications. If set to true, specs compliant schemas are used.
    */
   public ProtoSchemaConverter(boolean parquetSpecsCompliant) {
     this.parquetSpecsCompliant = parquetSpecsCompliant;
   }
 
-  public MessageType convert(Class<? extends Message> protobufClass) {
-    LOG.debug("Converting protocol buffer class \"" + protobufClass + "\" to parquet schema.");
-    Descriptors.Descriptor descriptor = Protobufs.getMessageDescriptor(protobufClass);
+  public MessageType convert(Descriptors.Descriptor descriptor) {
     MessageType messageType =
-        convertFields(Types.buildMessage(), descriptor.getFields())
+      convertFields(Types.buildMessage(), descriptor.getFields())
         .named(descriptor.getFullName());
     LOG.debug("Converter info:\n " + descriptor.toProto() + " was converted to \n" + messageType);
     return messageType;
+  }
+
+  public MessageType convert(Class<? extends Message> protobufClass) {
+    LOG.debug("Converting protocol buffer class \"" + protobufClass + "\" to parquet schema.");
+    Descriptors.Descriptor descriptor = Protobufs.getMessageDescriptor(protobufClass);
+    return convert(descriptor);
   }
 
   /* Iterates over list of fields. **/
   private <T> GroupBuilder<T> convertFields(GroupBuilder<T> groupBuilder, List<FieldDescriptor> fieldDescriptors) {
     for (FieldDescriptor fieldDescriptor : fieldDescriptors) {
       groupBuilder =
-          addField(fieldDescriptor, groupBuilder)
+        addField(fieldDescriptor, groupBuilder)
           .id(fieldDescriptor.getNumber())
           .named(fieldDescriptor.getName());
     }
@@ -113,11 +118,11 @@ public class ProtoSchemaConverter {
                                                                                                    LogicalTypeAnnotation logicalTypeAnnotation,
                                                                                                    final GroupBuilder<T> builder) {
     return builder
-        .group(Type.Repetition.OPTIONAL).as(listType())
-          .group(Type.Repetition.REPEATED)
-            .primitive(primitiveType, Type.Repetition.REQUIRED).as(logicalTypeAnnotation)
-          .named("element")
-        .named("list");
+      .group(Type.Repetition.OPTIONAL).as(listType())
+      .group(Type.Repetition.REPEATED)
+      .primitive(primitiveType, Type.Repetition.REQUIRED).as(logicalTypeAnnotation)
+      .named("element")
+      .named("list");
   }
 
   private <T> GroupBuilder<GroupBuilder<T>> addRepeatedMessage(FieldDescriptor descriptor, GroupBuilder<T> builder) {
@@ -169,14 +174,22 @@ public class ProtoSchemaConverter {
 
     JavaType javaType = fieldDescriptor.getJavaType();
     switch (javaType) {
-      case INT: return ParquetType.of(INT32);
-      case LONG: return ParquetType.of(INT64);
-      case DOUBLE: return ParquetType.of(DOUBLE);
-      case BOOLEAN: return ParquetType.of(BOOLEAN);
-      case FLOAT: return ParquetType.of(FLOAT);
-      case STRING: return ParquetType.of(BINARY, stringType());
-      case ENUM: return ParquetType.of(BINARY, enumType());
-      case BYTE_STRING: return ParquetType.of(BINARY);
+      case INT:
+        return ParquetType.of(INT32);
+      case LONG:
+        return ParquetType.of(INT64);
+      case DOUBLE:
+        return ParquetType.of(DOUBLE);
+      case BOOLEAN:
+        return ParquetType.of(BOOLEAN);
+      case FLOAT:
+        return ParquetType.of(FLOAT);
+      case STRING:
+        return ParquetType.of(BINARY, stringType());
+      case ENUM:
+        return ParquetType.of(BINARY, enumType());
+      case BYTE_STRING:
+        return ParquetType.of(BINARY);
       default:
         throw new UnsupportedOperationException("Cannot convert Protocol Buffer: unknown type " + javaType);
     }
